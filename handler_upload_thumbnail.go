@@ -1,10 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
 	"io"
-	"encoding/base64"
+	"os"
+	"fmt"
+	"strings"
+	"net/http"
+	"path/filepath"
+	// "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -51,17 +54,26 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	data, err := io.ReadAll(file)
+	// Get file extension and create a filepath in assests directory
+	fileExtension := strings.Split(mediaType,"/")[1] // image/png
+	filePath := filepath.Join(cfg.assetsRoot,videoIDString + "." + fileExtension) // assets/6dccdc00-f8ab-4bda-bc03-39a27f926558.png
+	
+
+	// Create file on disk
+	outputFile, err := os.Create(filePath)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Unable to read content bytes", err)
-		return		
+		respondWithError(w, 500, "Unable to create byte file", err)
+		return				
 	}
 
-	// Encode thumbnail
-	base64Data := base64.StdEncoding.EncodeToString(data)
+	defer outputFile.Close()
 
-	// Create data URL
-	dataURL := fmt.Sprintf("data:%s;base64,%s",mediaType,base64Data)
+	// Copy file contents
+	_, err = io.Copy(outputFile, file)
+	if err != nil {
+		respondWithError(w, 500, "Unable to copy contents of file", err)
+		return					
+	}
 
 	// Get video meta-data from video ID
 	video, err := cfg.db.GetVideo(videoID)
@@ -75,15 +87,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return				
 	}
 
-	// Save thumbnail in global map
-	// videoThumbnails[videoID] = thumbnail{
-	// 	data: data,
-	// 	mediaType: mediaType,
-	// }
-
-	// thumbnail url
-	// thumbnailURL := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s",cfg.port,videoIDString)
-
+	dataURL := fmt.Sprintf("http://localhost:%s/%s",cfg.port,filePath)
 	video.ThumbnailURL = &dataURL
 
 	err = cfg.db.UpdateVideo(video)
@@ -95,22 +99,3 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	respondWithJSON(w, http.StatusOK, video)
 
 }
-
-
-/* type Video struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	ThumbnailURL *string   `json:"thumbnail_url"`
-	VideoURL     *string   `json:"video_url"`
-	CreateVideoParams
-} 
-	
-type thumbnail struct {
-	data      []byte
-	mediaType string
-}
-
-var videoThumbnails = map[uuid.UUID]thumbnail{}
-
-*/
