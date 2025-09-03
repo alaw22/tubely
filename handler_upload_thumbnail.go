@@ -7,6 +7,7 @@ import (
 	"strings"
 	"net/http"
 	"path/filepath"
+	"mime"
 	// "encoding/base64"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -48,10 +49,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 	defer file.Close()
 
-	mediaType := header.Header.Get("Content-Type")
-	if mediaType == "" {
-		respondWithError(w, http.StatusBadRequest, "Content-Type header is empty", err)
+	mediaType, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Unable to obtain media type", err)
 		return
+	}
+
+	if mediaType != "image/jpeg" && mediaType != "image/png"{
+		respondWithError(w,
+						 http.StatusBadRequest,
+						 "Expecting image/jpeg or image/png",
+						 fmt.Errorf("Expecting image/jpeg or image/png but got %s",
+						 			mediaType))
+		return 
 	}
 
 	// Get file extension and create a filepath in assests directory
