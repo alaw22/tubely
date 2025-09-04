@@ -8,7 +8,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"mime"
-	// "encoding/base64"
+	"encoding/base64"
+	"crypto/rand"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -67,7 +68,13 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	// Get file extension and create a filepath in assests directory
 	fileExtension := strings.Split(mediaType,"/")[1] // image/png
-	filePath := filepath.Join(cfg.assetsRoot,videoIDString + "." + fileExtension) // assets/6dccdc00-f8ab-4bda-bc03-39a27f926558.png
+	key := make([]byte,32)
+	rand.Read(key)
+
+	encodedKey := make([]byte, base64.RawURLEncoding.EncodedLen(len(key)))
+	base64.RawURLEncoding.Encode(encodedKey,key)
+
+	filePath := filepath.Join(cfg.assetsRoot,string(encodedKey) + "." + fileExtension) // assets/6dccdc00-f8ab-4bda-bc03-39a27f926558.png
 	
 
 	// Create file on disk
