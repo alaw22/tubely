@@ -113,11 +113,26 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		videoName = fmt.Sprintf("other/%s",videoName)
 	}
 
+	processedFileName, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, 500, "Error encoding video with fast start",err)
+		return 
+	}
+	defer os.Remove(processedFileName)
+
+	processedFile, err := os.Open(processedFileName)
+	if err != nil {
+		respondWithError(w, 500, "Error opening fast start mp4 file",err)
+		return
+	}
+
+	defer processedFile.Close()
+
 	// Place video into s3 bucket
 	objectInput := s3.PutObjectInput{
 		Bucket: &cfg.s3Bucket,
 		Key: &videoName,
-		Body: tempFile,
+		Body: processedFile,
 		ContentType: &mediaType,
 	}
 
