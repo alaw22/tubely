@@ -111,7 +111,6 @@ func main() {
 		port:             port,
 	}
 
-
 	err = cfg.ensureAssetsDir()
 	if err != nil {
 		log.Fatalf("Couldn't create assets directory: %v", err)

@@ -77,24 +77,41 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 
 	videoName := string(encodedKey) + "." + fileExtension
 
-
 	tempFile, err := os.CreateTemp("","tubely-video-upload.mp4")
 	if err != nil {
 		respondWithError(w, 500, "Error creating temporary mp4 file",err)
 		return
 	}
 
-	defer os.Remove("tubely-video-upload.mp4")
+	defer os.Remove(tempFile.Name())
 	defer tempFile.Close() // defer is LIFO so it will close before removing
 
+	
 	_, err = io.Copy(tempFile, videoFile)
 	if err != nil {
 		respondWithError(w, 500, "Error copying contents of video file",err)
 		return 
 	}
 
+	
 	// Rewind temp file pointer
 	tempFile.Seek(0, io.SeekStart)
+	
+	// grab aspect ratio and include it in the url
+	aspect, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, 500, "Error getting aspect ratio from temp file",err)
+		return
+	}
+
+	switch aspect {
+	case "16:9":
+		videoName = fmt.Sprintf("landscape/%s",videoName)
+	case "9:16":
+		videoName = fmt.Sprintf("portrait/%s",videoName)
+	default:
+		videoName = fmt.Sprintf("other/%s",videoName)
+	}
 
 	// Place video into s3 bucket
 	objectInput := s3.PutObjectInput{
