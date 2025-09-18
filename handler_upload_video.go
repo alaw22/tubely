@@ -104,13 +104,14 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var s3Key string
 	switch aspect {
 	case "16:9":
-		videoName = fmt.Sprintf("landscape/%s",videoName)
+		s3Key = fmt.Sprintf("landscape/%s",videoName)
 	case "9:16":
-		videoName = fmt.Sprintf("portrait/%s",videoName)
+		s3Key = fmt.Sprintf("portrait/%s",videoName)
 	default:
-		videoName = fmt.Sprintf("other/%s",videoName)
+		s3Key = fmt.Sprintf("other/%s",videoName)
 	}
 
 	processedFileName, err := processVideoForFastStart(tempFile.Name())
@@ -131,7 +132,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	// Place video into s3 bucket
 	objectInput := s3.PutObjectInput{
 		Bucket: &cfg.s3Bucket,
-		Key: &videoName,
+		Key: &s3Key,
 		Body: processedFile,
 		ContentType: &mediaType,
 	}
@@ -142,11 +143,18 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",cfg.s3Bucket,cfg.s3Region,videoName)
+	// videoURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s",cfg.s3Bucket,cfg.s3Region,s3Key)
+	videoURL := fmt.Sprintf("%s,%s",cfg.s3Bucket,s3Key)
 
 	video.VideoURL = &videoURL
+	
+	signedVideo, err := cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, 450, "Unable to sign video URL",err)
+		return
+	}
 
-	err = cfg.db.UpdateVideo(video)
+	err = cfg.db.UpdateVideo(signedVideo)
 	if err != nil {
 		respondWithError(w, 500, "Unable to update video URL",err)
 		return
